@@ -1,837 +1,566 @@
 import React, { useState, useRef, useEffect } from "react";
-import { 
-  Heart, Sparkles, Cake, Star, Music, Volume2, VolumeX, 
-  Upload, Camera, RefreshCw, ChevronRight, Moon, Lightbulb, 
-  PartyPopper, Wand2, Mail, Check, Disc3, Image as ImageIcon, X
+import {
+  Heart,
+  Sparkles,
+  Camera,
+  RotateCcw,
+  X,
+  Disc3,
+  Moon,
+  Sun
 } from "lucide-react";
 
 export default function App() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [showSpotify, setShowSpotify] = useState(true);
-  const [envelopeOpened, setEnvelopeOpened] = useState(false);
+  const [envelopeOpen, setEnvelopeOpen] = useState(false);
   const [lightsOn, setLightsOn] = useState(false);
   const [cakeCut, setCakeCut] = useState(false);
   const [wishMade, setWishMade] = useState(false);
-  const [isCutting, setIsCutting] = useState(false);
-  const [activeZoomPhoto, setActiveZoomPhoto] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [showMusicPlayer, setShowMusicPlayer] = useState(true);
 
-  // Real photos mapped with primary direct CDN link, backup direct link, and web page reference
-  const initialPolaroids = [
+  const [photos, setPhotos] = useState([
     {
-      id: 1,
-      caption: "that sunny picnic 🧺",
-      tag: "Road Trip by the Car",
-      rotation: "-rotate-2",
-      imageSrc: "https://i.ibb.co/3YQgJLhB/WhatsApp-Image-2026-11-06-at-00-22-50.jpg",
-      pageUrl: "https://ibb.co/3YQgJLhB"
+      id: "picnic",
+      title: "that sunny picnic 🧺",
+      subtitle: "White SUV adventure & scenic vibes",
+      url: "https://i.ibb.co/3YQgJLhB/WhatsApp-Image-2026-11-06-at-00-22-50.jpg",
+      proxyUrl: "https://images.weserv.nl/?url=https://i.ibb.co/3YQgJLhB/WhatsApp-Image-2026-11-06-at-00-22-50.jpg",
+      rotation: "-rotate-2"
     },
     {
-      id: 2,
-      caption: "counting stars ✨",
-      tag: "Festive Night Out",
-      rotation: "rotate-2",
-      imageSrc: "https://i.ibb.co/C3rNJ2qg/WhatsApp-Image-2026-11-06-at-00-26-17.jpeg",
-      pageUrl: "https://ibb.co/C3rNJ2qg"
+      id: "stars",
+      title: "counting stars ✨",
+      subtitle: "Festive celebration & golden smiles",
+      url: "https://i.ibb.co/C3rNJ2qg/WhatsApp-Image-2026-11-06-at-00-26-17.jpeg",
+      proxyUrl: "https://images.weserv.nl/?url=https://i.ibb.co/C3rNJ2qg/WhatsApp-Image-2026-11-06-at-00-26-17.jpeg",
+      rotation: "rotate-2"
     },
     {
-      id: 3,
-      caption: "the sweetest chaos 🍰",
-      tag: "Cute Wink & Curls",
-      rotation: "-rotate-1",
-      imageSrc: "https://i.ibb.co/3y1bKtD3/WhatsApp-Image-2026-11-06-at-00-21-29.jpg",
-      pageUrl: "https://ibb.co/3y1bKtD3"
+      id: "chaos",
+      title: "the sweetest chaos 🍰",
+      subtitle: "Playful wink & golden hour curls",
+      url: "https://i.ibb.co/3y1bKtD3/WhatsApp-Image-2026-11-06-at-00-21-29.jpg",
+      proxyUrl: "https://images.weserv.nl/?url=https://i.ibb.co/3y1bKtD3/WhatsApp-Image-2026-11-06-at-00-21-29.jpg",
+      rotation: "-rotate-3"
     },
     {
-      id: 4,
-      caption: "top of the world 🎈",
-      tag: "Butterfly Glow Portrait",
-      rotation: "rotate-3",
-      imageSrc: "https://i.ibb.co/M4pvGLD/WhatsApp-Image-2026-11-06-at-00-23-33.jpg",
-      pageUrl: "https://ibb.co/M4pvGLD"
+      id: "world",
+      title: "top of the world 🎈",
+      subtitle: "Pure elegance & butterfly charm",
+      url: "https://i.ibb.co/M4pvGLD/WhatsApp-Image-2026-11-06-at-00-23-33.jpg",
+      proxyUrl: "https://images.weserv.nl/?url=https://i.ibb.co/M4pvGLD/WhatsApp-Image-2026-11-06-at-00-23-33.jpg",
+      rotation: "rotate-3"
     }
-  ];
+  ]);
 
-  const [polaroids, setPolaroids] = useState(initialPolaroids);
+  const fileInputRef = useRef(null);
+  const [activeUploadId, setActiveUploadId] = useState(null);
 
-  // Load any user uploaded overrides from local storage if saved
   useEffect(() => {
     try {
-      const savedPhotos = localStorage.getItem("madam_ji_photos");
-      if (savedPhotos) {
-        const parsed = JSON.parse(savedPhotos);
-        setPolaroids(prev =>
-          prev.map(p => ({
-            ...p,
-            userPhoto: parsed[p.id] || null
-          }))
+      const saved = localStorage.getItem("madamji_custom_photos");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setPhotos((prev) =>
+          prev.map((item) => {
+            const match = parsed.find((p) => p.id === item.id);
+            return match && match.url ? { ...item, url: match.url, proxyUrl: match.url } : item;
+          })
         );
       }
     } catch (e) {
-      console.log("Storage check:", e);
+      console.error(e);
     }
   }, []);
 
-  // Handle Photo File Upload & save to Base64 in state + localStorage
-  const handlePhotoUpload = (e, id) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64Data = event.target.result;
-      setPolaroids(prev => {
-        const updated = prev.map(p => p.id === id ? { ...p, userPhoto: base64Data } : p);
-        try {
-          const toSave = {};
-          updated.forEach(item => {
-            if (item.userPhoto) toSave[item.id] = item.userPhoto;
-          });
-          localStorage.setItem("madam_ji_photos", JSON.stringify(toSave));
-        } catch (err) {
-          console.log("Could not store image locally:", err);
-        }
-        return updated;
-      });
-      playChime(780, "sine", 0.4);
-    };
-    reader.readAsDataURL(file);
+  const handleOpenEnvelope = () => {
+    setEnvelopeOpen(true);
+    setTimeout(() => {
+      setCurrentStep(2);
+    }, 1500);
   };
 
-  const removeCustomPhoto = (id, e) => {
+  const handleTurnOnLights = () => {
+    setLightsOn(true);
+    setTimeout(() => {
+      setCurrentStep(3);
+    }, 1000);
+  };
+
+  const triggerUpload = (id, e) => {
     e.stopPropagation();
-    setPolaroids(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, userPhoto: null } : p);
-      try {
-        const toSave = {};
-        updated.forEach(item => {
-          if (item.userPhoto) toSave[item.id] = item.userPhoto;
-        });
-        localStorage.setItem("madam_ji_photos", JSON.stringify(toSave));
-      } catch (err) {}
-      return updated;
-    });
-  };
-
-  // Audio synthesizer for cute sound effects using Web Audio API
-  const playChime = (freq = 520, type = "sine", duration = 0.4) => {
-    try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + duration);
-    } catch (e) {
-      // Audio not permitted or supported
+    setActiveUploadId(id);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
-  const playConfettiMelody = () => {
-    [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-      setTimeout(() => playChime(freq, "triangle", 0.5), idx * 120);
-    });
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file && activeUploadId) {
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const dataUrl = uploadEvent.target?.result;
+        setPhotos((prev) => {
+          const updated = prev.map((item) =>
+            item.id === activeUploadId ? { ...item, url: dataUrl, proxyUrl: dataUrl } : item
+          );
+          try {
+            localStorage.setItem("madamji_custom_photos", JSON.stringify(updated));
+          } catch (err) {
+            console.error(err);
+          }
+          return updated;
+        });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const playCakeCutSound = () => {
-    playChime(320, "sawtooth", 0.2);
-    setTimeout(() => playChime(640, "sine", 0.4), 150);
-  };
-
-  const playWishSound = () => {
-    [600, 800, 1000, 1200, 1500].forEach((freq, idx) => {
-      setTimeout(() => playChime(freq, "sine", 0.6), idx * 100);
-    });
-  };
-
-  // Screen 1: Open Envelope
-  const handleEnvelopeClick = () => {
-    playChime(440, "triangle", 0.3);
-    setEnvelopeOpened(true);
-    setTimeout(() => {
-      playChime(660, "sine", 0.5);
-      setCurrentStep(2);
-    }, 1800);
-  };
-
-  // Screen 2: Lights Switch
-  const handleTurnLightsOn = () => {
-    setLightsOn(true);
-    playConfettiMelody();
-    setTimeout(() => {
-      setCurrentStep(3);
-    }, 1200);
-  };
-
-  // Screen 4: Cake Cutting logic
-  const handleCakeSlice = () => {
-    if (cakeCut) return;
-    setIsCutting(true);
-    playCakeCutSound();
-    setTimeout(() => {
-      setCakeCut(true);
-      setIsCutting(false);
-      playConfettiMelody();
-    }, 600);
-  };
-
-  // Screen 5: Make a wish
-  const handleMakeWish = () => {
-    playWishSound();
-    setWishMade(true);
-    setTimeout(() => {
-      setCurrentStep(6);
-    }, 2800);
-  };
-
-  const resetAll = () => {
+  const resetSurprise = () => {
     setCurrentStep(1);
-    setEnvelopeOpened(false);
+    setEnvelopeOpen(false);
     setLightsOn(false);
     setCakeCut(false);
     setWishMade(false);
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#fdf8f4] text-[#4a3b32] font-sans antialiased relative overflow-hidden flex flex-col items-center justify-between selection:bg-pink-200">
-      
-      {/* Background Floating Ambient Particles */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-10 left-[10%] w-32 h-32 bg-pink-200/40 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-[15%] w-48 h-48 bg-amber-100/60 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-rose-100/30 rounded-full blur-3xl" />
-        {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute text-amber-300/40 text-xs animate-ping"
-            style={{
-              top: `${(i * 19) % 90}%`,
-              left: `${(i * 27) % 94}%`,
-              animationDuration: `${2.5 + (i % 3)}s`
-            }}
-          >
-            ✦
+    <div className="min-h-screen bg-[#FFF9F6] text-gray-800 flex flex-col items-center justify-between font-sans selection:bg-rose-200 selection:text-rose-800 overflow-x-hidden relative transition-colors duration-700">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Floating Spotify Audio Bar */}
+      <div className="fixed top-3 z-50 flex flex-col items-center max-w-sm w-full px-4 transition-all">
+        <div className="bg-white/95 backdrop-blur-md shadow-md border border-rose-100 rounded-full px-4 py-1.5 flex items-center justify-between gap-3 w-full">
+          <div className="flex items-center gap-2 text-rose-600">
+            <Disc3 className="w-5 h-5 animate-spin" style={{ animationDuration: "4s" }} />
+            <span className="text-xs font-semibold tracking-wide text-rose-900">Madam Ji's Song</span>
           </div>
-        ))}
+          <button
+            type="button"
+            onClick={() => setShowMusicPlayer(!showMusicPlayer)}
+            className="text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 px-3 py-1 rounded-full border border-rose-200 transition font-medium"
+          >
+            {showMusicPlayer ? "Hide Player" : "Music 🎵"}
+          </button>
+        </div>
+
+        {showMusicPlayer && (
+          <div className="w-full mt-2 rounded-2xl overflow-hidden shadow-2xl border-2 border-rose-200 transition-all duration-300">
+            <iframe
+              style={{ borderRadius: "12px" }}
+              src="https://open.spotify.com/embed/track/0uROb6x5IunKokDggpmwKz?utm_source=generator&theme=0"
+              width="100%"
+              height="80"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              title="Spotify Player"
+            ></iframe>
+          </div>
+        )}
       </div>
 
-      {/* Top Header / Progress Bar */}
-      <header className="w-full max-w-md pt-5 px-6 flex items-center justify-between z-20">
-        <div className="flex items-center gap-1.5 text-xs tracking-wider text-pink-600/80 font-medium uppercase">
-          <Heart className="w-3.5 h-3.5 fill-pink-500 text-pink-500 animate-bounce" />
-          <span>Birthday Surprise</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Spotify Player Toggle Button */}
-          <button
-            onClick={() => setShowSpotify(!showSpotify)}
-            title="Music Player"
-            className="flex items-center gap-1 text-[11px] font-semibold text-pink-700 bg-pink-100/90 hover:bg-pink-200 border border-pink-200 px-2.5 py-1 rounded-full shadow-sm transition-all"
-          >
-            <Disc3 className="w-3.5 h-3.5 animate-spin text-pink-600" />
-            <span>Music</span>
-          </button>
-          <span className="text-[11px] font-semibold text-stone-400 bg-white/70 backdrop-blur px-2.5 py-1 rounded-full border border-stone-200 shadow-sm">
-            Step {currentStep} / 8
-          </span>
-        </div>
-      </header>
-
-      {/* Floating Spotify Player */}
-      {showSpotify && (
-        <div className="w-full max-w-md px-4 mt-2 z-20 transition-all duration-300">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-pink-100 flex flex-col gap-1">
-            <div className="flex items-center justify-between px-2 text-[10px] text-stone-400 font-medium">
-              <span className="flex items-center gap-1">
-                <Music className="w-3 h-3 text-pink-500" /> Playing Madam Ji's Song
-              </span>
-              <button 
-                onClick={() => setShowSpotify(false)} 
-                className="hover:text-stone-700 text-xs px-1"
-              >
-                ✕
-              </button>
-            </div>
-            <iframe 
-              style={{ borderRadius: "12px" }} 
-              src="https://open.spotify.com/embed/track/0uROb6x5IunKokDggpmwKz?utm_source=generator&theme=0" 
-              width="100%" 
-              height="80" 
-              frameBorder="0" 
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-              loading="lazy"
-              title="Spotify Birthday Track"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Main Dynamic Viewport */}
-      <main className="w-full max-w-md flex-1 flex flex-col items-center justify-center px-4 py-6 z-10">
-
-        {/* SCREEN 1: THE ENVELOPE */}
+      <main className="w-full max-w-md min-h-screen flex flex-col items-center justify-center p-6 pt-28 pb-12">
+        {/* STEP 1: Envelope */}
         {currentStep === 1 && (
-          <div className="w-full flex flex-col items-center text-center animate-fade-in">
-            <span className="text-pink-500 text-sm font-medium tracking-wide flex items-center gap-1 mb-1 animate-pulse">
-              a little something ✨
+          <div className="flex flex-col items-center text-center page-transition w-full">
+            <span className="text-sm font-medium tracking-widest uppercase text-rose-400 mb-2">
+              A Special Delivery
             </span>
-            <h1 className="text-3xl font-serif font-bold text-stone-800 tracking-tight mb-1">
-              There's something for you
-            </h1>
-            <p className="text-stone-500 text-xs sm:text-sm mb-6 max-w-xs">
-              A tiny birthday surprise, made just for you.
-            </p>
-
-            <div className="relative w-72 h-64 flex items-center justify-center my-2">
-              <div 
-                className={`absolute w-56 bg-white rounded-2xl shadow-xl p-4 flex flex-col items-center border border-pink-100 transition-all duration-1000 ease-out z-10 ${
-                  envelopeOpened ? "-translate-y-24 scale-105 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
-                }`}
-              >
-                <div className="text-[10px] uppercase font-semibold text-pink-400 tracking-widest">For</div>
-                <div className="text-2xl font-serif font-bold text-pink-600 my-0.5">
-                  Madam Ji 🌸
-                </div>
-                <div className="text-xs text-stone-400 flex items-center gap-1">
-                  <span>Special Delivery</span> • <span>6 Nov</span>
-                </div>
-                <div className="text-3xl mt-2 animate-bounce">🧸🎀🐰</div>
-              </div>
-
-              <div 
-                onClick={handleEnvelopeClick}
-                className="group cursor-pointer relative w-64 h-48 bg-gradient-to-br from-[#f8eee4] to-[#edd9c7] rounded-3xl shadow-2xl border-2 border-[#e3ceba] flex flex-col items-center justify-center p-4 transition-transform duration-300 hover:scale-[1.02] z-20"
-              >
-                <div className="text-3xl mb-1 filter drop-shadow-md group-hover:scale-110 transition-transform">
-                  🌾🌸💐
-                </div>
-                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-rose-500 to-pink-400 border-2 border-rose-200/80 shadow-md flex items-center justify-center text-white text-lg font-bold group-hover:scale-110 transition-all">
-                  <Heart className="w-7 h-7 fill-white text-white drop-shadow" />
-                </div>
-                <div className="absolute -bottom-2 text-pink-400/80 text-xl">🎀</div>
-              </div>
-            </div>
-
-            <div className="mt-6 w-full max-w-xs">
-              <button
-                onClick={handleEnvelopeClick}
-                disabled={envelopeOpened}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl hover:from-pink-600 hover:to-rose-600 active:scale-95 transition-all flex items-center justify-center gap-2 group"
-              >
-                <Heart className="w-4 h-4 fill-white text-white group-hover:animate-ping" />
-                <span>{envelopeOpened ? "Opening surprise..." : "Open your surprise ✨"}</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* SCREEN 2: DARK ROOM */}
-        {currentStep === 2 && (
-          <div className={`w-full max-w-md h-[540px] rounded-3xl relative overflow-hidden flex flex-col items-center justify-between p-8 text-center transition-all duration-1000 ${
-            lightsOn ? "bg-amber-50" : "bg-gradient-to-b from-[#0f1123] via-[#161a33] to-[#0d0f1f] text-slate-100"
-          }`}>
-            <div className="absolute inset-0 pointer-events-none">
-              {[...Array(24)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute text-amber-200 animate-pulse text-[10px]"
-                  style={{
-                    top: `${(i * 17) % 85}%`,
-                    left: `${(i * 23) % 90}%`,
-                    animationDuration: `${1.5 + (i % 4)}s`
-                  }}
-                >
-                  ✦
-                </div>
-              ))}
-              <div className="absolute top-10 right-10 text-3xl opacity-80 animate-pulse">
-                🌙
-              </div>
-            </div>
-
-            {lightsOn && (
-              <div className="absolute inset-0 bg-gradient-to-b from-amber-200/40 via-yellow-100/30 to-transparent pointer-events-none animate-fade-in" />
-            )}
-
-            <div className="mt-8 z-10">
-              <span className="text-amber-300 font-serif italic text-lg tracking-wider block mb-2">
-                Shhh...
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide">
-                The room is waiting for you.
-              </h2>
-              <p className="text-slate-300/80 text-xs sm:text-sm mt-2 max-w-xs mx-auto">
-                Someone left the lights off on purpose.
-              </p>
-            </div>
-
-            <div className="z-10 flex flex-col items-center my-auto">
-              <div className="relative">
-                <span className="text-7xl filter drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)] animate-pulse inline-block">
-                  🧸
-                </span>
-                <span className="absolute -top-3 -right-2 text-2xl rotate-12">
-                  💤
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-2 font-mono tracking-wider">
-                sleeping gently...
-              </p>
-            </div>
-
-            <div className="w-full max-w-xs z-10 mb-2">
-              <button
-                onClick={handleTurnLightsOn}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-400 text-stone-900 font-semibold text-sm shadow-lg shadow-amber-500/30 hover:shadow-amber-400/60 active:scale-95 transition-all flex items-center justify-center gap-2 border border-amber-200"
-              >
-                <Lightbulb className="w-4 h-4 text-stone-900 fill-stone-900 animate-bounce" />
-                <span>Turn on the lights 💡</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* SCREEN 3: SURPRISE PARTY REVEAL */}
-        {currentStep === 3 && (
-          <div className="w-full flex flex-col items-center text-center animate-fade-in">
-            <div className="text-3xl mb-1 tracking-widest animate-bounce">
-              🎊 🎈 🎉 🎈 🎊
-            </div>
-            <p className="text-stone-400 text-xs font-serif italic mb-1">
-              Look who's having a birthday...
-            </p>
-            <h1 className="text-3xl sm:text-4xl font-serif font-extrabold text-stone-800 tracking-tight">
-              Happy Birthday, <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-600 via-rose-500 to-purple-600">
-                Madam Ji ✨
-              </span>
+            <h1 className="text-2xl font-serif font-bold text-gray-800 mb-8">
+              There's something for you...
             </h1>
 
-            <div className="my-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-pink-100/80 border border-pink-200 text-pink-700 text-xs font-bold shadow-sm">
-              <span>🗓️</span>
-              <span>6 November</span>
-            </div>
-
-            <div className="relative my-4 flex items-center justify-center">
-              <div className="w-52 h-52 bg-gradient-to-b from-pink-100 to-amber-50 rounded-full flex items-center justify-center border-4 border-white shadow-xl relative overflow-hidden">
-                <span className="text-7xl filter drop-shadow-md">
-                  🧸
-                </span>
-                <div className="flex gap-2 text-2xl -mt-2 absolute bottom-5">
-                  <span>🍰</span>
-                  <span>🎁</span>
-                  <span>💐</span>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-rose-400 text-xs font-serif italic mb-6">
-              yay, you're here! The whole world is celebrating you today.
-            </p>
-
-            <div className="w-full max-w-xs">
-              <button
-                onClick={() => {
-                  playChime(580, "triangle", 0.3);
-                  setCurrentStep(4);
-                }}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
-              >
-                <span>There's more ✨</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* SCREEN 4: CAKE CUTTING */}
-        {currentStep === 4 && (
-          <div className="w-full flex flex-col items-center text-center animate-fade-in">
-            <span className="text-pink-500 text-xs font-bold uppercase tracking-wider mb-1">
-              Cake time
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-800">
-              {cakeCut ? "You did it! 🎉" : "Make the first cut ✨"}
-            </h2>
-            <p className="text-stone-500 text-xs sm:text-sm mt-1 mb-4 max-w-xs">
-              {cakeCut 
-                ? "The first slice is always the sweetest one." 
-                : "Tap or slice down across the cake, top to bottom."
-              }
-            </p>
-
-            <div 
-              onClick={handleCakeSlice}
-              className={`relative cursor-pointer w-64 h-64 bg-white/60 backdrop-blur rounded-3xl border border-pink-100 shadow-xl flex flex-col items-center justify-center p-4 transition-all my-2 select-none ${
-                isCutting ? "scale-95" : "hover:shadow-2xl"
+            <div
+              onClick={handleOpenEnvelope}
+              className={`relative cursor-pointer transition-all duration-700 hover:scale-105 active:scale-95 ${
+                envelopeOpen ? "scale-105" : ""
               }`}
             >
-              <div className="flex gap-4 mb-1 z-10">
-                {[1, 2, 3].map(candle => (
-                  <div key={candle} className="flex flex-col items-center">
-                    <div className="w-2 h-3 bg-gradient-to-t from-orange-400 to-yellow-200 rounded-full animate-ping opacity-90 shadow-[0_0_8px_gold]" />
-                    <div className="w-1.5 h-6 bg-pink-300 rounded-t-sm border-b border-pink-400" />
+              <div className="w-72 h-48 bg-[#F4E3D7] rounded-xl shadow-xl relative overflow-hidden flex items-center justify-center border border-[#e0c9ba]">
+                {/* Flap */}
+                <div
+                  className={`absolute top-0 left-0 w-0 h-0 border-l-[144px] border-l-transparent border-r-[144px] border-r-transparent border-t-[96px] border-t-[#edd1c2] z-20 origin-top transition-transform duration-700 ${
+                    envelopeOpen ? "-rotate-180 opacity-0" : ""
+                  }`}
+                ></div>
+
+                {/* Seal */}
+                {!envelopeOpen && (
+                  <div className="absolute z-30 w-12 h-12 rounded-full bg-rose-600 flex items-center justify-center shadow-lg border-2 border-rose-400 animate-pulse">
+                    <Heart className="w-6 h-6 text-white fill-white" />
+                  </div>
+                )}
+
+                {/* Sliding Letter */}
+                <div
+                  className={`absolute w-60 h-40 bg-white rounded-lg shadow-md border border-rose-100 p-4 flex flex-col items-center justify-center transition-all duration-700 ${
+                    envelopeOpen ? "-translate-y-16 shadow-2xl z-25 opacity-100" : "translate-y-6 opacity-0"
+                  }`}
+                >
+                  <p className="text-xs uppercase tracking-widest text-rose-400 font-semibold">Special Invite</p>
+                  <h3 className="text-lg font-serif font-bold text-rose-800 mt-1">To Madam Ji ✨</h3>
+                  <p className="text-[11px] text-gray-500 mt-1">Tap to open your birthday surprise!</p>
+                </div>
+
+                <div className="absolute bottom-2 text-rose-900/40 text-xs font-serif italic">
+                  Tap to open
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400 mt-8">Click or tap on the envelope to open</p>
+          </div>
+        )}
+
+        {/* STEP 2: Dark Room */}
+        {currentStep === 2 && (
+          <div
+            className={`flex flex-col items-center text-center p-8 rounded-3xl w-full transition-all duration-700 ${
+              lightsOn ? "bg-amber-50" : "bg-slate-900 shadow-2xl text-white"
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Moon className={`w-5 h-5 ${lightsOn ? "text-amber-500" : "text-amber-200 animate-pulse"}`} />
+              <span className={`text-xs uppercase tracking-widest ${lightsOn ? "text-amber-700" : "text-amber-200"}`}>
+                Midnight Mystery
+              </span>
+            </div>
+
+            <h2 className="text-2xl font-serif font-bold mb-3">
+              {lightsOn ? "The lights are turning on! ✨" : "Shhh... someone's in here"}
+            </h2>
+            <p className={`text-sm mb-8 ${lightsOn ? "text-amber-800" : "text-slate-300"}`}>
+              {lightsOn
+                ? "Here comes the surprise..."
+                : "The room is waiting for you. Someone left the lights off on purpose."}
+            </p>
+
+            <div className="w-40 h-40 rounded-full flex items-center justify-center relative mb-8">
+              <div className="text-7xl animate-float">
+                {lightsOn ? "🧸🎉" : "🧸💤"}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleTurnOnLights}
+              disabled={lightsOn}
+              className={`px-6 py-3.5 rounded-full font-medium text-sm flex items-center gap-2 shadow-lg transition-all transform active:scale-95 ${
+                lightsOn
+                  ? "bg-amber-400 text-amber-950 font-bold scale-105"
+                  : "bg-white/10 hover:bg-white/20 text-white border border-white/30 hover:border-amber-300 hover:text-amber-200"
+              }`}
+            >
+              <Sun className="w-4 h-4 text-amber-400" />
+              Turn on the lights 💡
+            </button>
+          </div>
+        )}
+
+        {/* STEP 3: Reveal */}
+        {currentStep === 3 && (
+          <div className="flex flex-col items-center text-center page-transition w-full">
+            <div className="bg-rose-100 text-rose-700 px-4 py-1 rounded-full text-xs font-bold tracking-wider uppercase mb-3 flex items-center gap-1.5 shadow-sm border border-rose-200 animate-bounce">
+              <Sparkles className="w-3.5 h-3.5 text-rose-500" /> 6 November
+            </div>
+
+            <h1 className="text-3xl font-serif font-extrabold text-rose-900 leading-tight">
+              Happy Birthday, <br />
+              <span className="text-rose-600 underline decoration-rose-300 decoration-wavy">Madam Ji!</span> ✨
+            </h1>
+
+            <p className="text-sm text-gray-600 mt-3 max-w-xs">
+              Yay, you're here! Today is entirely all about celebrating you and your precious smile.
+            </p>
+
+            <div className="my-8 text-8xl animate-float select-none">
+              🎂✨🎈
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentStep(4)}
+              className="bg-rose-500 hover:bg-rose-600 text-white font-medium px-8 py-3.5 rounded-full shadow-lg shadow-rose-300 transition transform hover:scale-105 active:scale-95 flex items-center gap-2"
+            >
+              Let's cut the cake! 🍰
+            </button>
+          </div>
+        )}
+
+        {/* STEP 4: Cut Cake */}
+        {currentStep === 4 && (
+          <div className="flex flex-col items-center text-center w-full page-transition">
+            <span className="text-xs font-semibold tracking-widest uppercase text-rose-400 mb-2">
+              Time for a treat
+            </span>
+            <h2 className="text-2xl font-serif font-bold text-gray-800 mb-2">Slice your birthday cake</h2>
+            <p className="text-xs text-gray-500 mb-6">Tap the knife or button to cut the cake!</p>
+
+            <div className="relative w-64 h-56 flex flex-col items-center justify-end mb-8 select-none">
+              <div className="flex gap-4 mb-2 z-10">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex flex-col items-center">
+                    <div className="w-2.5 h-3.5 bg-amber-400 rounded-full animate-bounce shadow-md shadow-amber-300"></div>
+                    <div className="w-1.5 h-6 bg-pink-400 rounded-sm"></div>
                   </div>
                 ))}
               </div>
 
-              <div className="relative flex items-center justify-center">
-                {cakeCut ? (
-                  <div className="flex items-center gap-5 transition-all duration-700 ease-out">
-                    <div className="flex flex-col items-end transform -rotate-3 transition-transform">
-                      <div className="w-16 h-8 bg-rose-300 rounded-tl-xl border-l-2 border-t-2 border-rose-200 flex items-center justify-end pr-1 text-xs">🍓</div>
-                      <div className="w-20 h-10 bg-pink-200 rounded-tl-xl border-l-2 border-pink-100 flex items-center justify-end pr-1 text-[10px]">✨</div>
-                      <div className="w-24 h-12 bg-rose-400 rounded-tl-2xl border-l-2 border-b-2 border-rose-300 flex items-center justify-end pr-2 text-sm">🍰</div>
-                    </div>
-                    <div className="h-28 w-0.5 bg-gradient-to-b from-amber-300 to-transparent animate-pulse" />
-                    <div className="flex flex-col items-start transform rotate-3 transition-transform">
-                      <div className="w-16 h-8 bg-rose-300 rounded-tr-xl border-r-2 border-t-2 border-rose-200 flex items-center justify-start pl-1 text-xs">🍓</div>
-                      <div className="w-20 h-10 bg-pink-200 rounded-tr-xl border-r-2 border-pink-100 flex items-center justify-start pl-1 text-[10px]">✨</div>
-                      <div className="w-24 h-12 bg-rose-400 rounded-tr-2xl border-r-2 border-b-2 border-rose-300 flex items-center justify-start pl-2 text-sm">🍰</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center group">
-                    <div className="absolute inset-y-0 w-0.5 border-r-2 border-dashed border-rose-400/80 z-20 pointer-events-none group-hover:opacity-100 transition-opacity" />
-                    <div className="w-32 h-9 bg-gradient-to-r from-rose-300 via-pink-200 to-rose-300 rounded-t-2xl shadow-inner border border-rose-200 flex items-center justify-around px-2">
-                      <span>🍓</span>
-                      <span>🍒</span>
-                      <span>🍓</span>
-                    </div>
-                    <div className="w-40 h-11 bg-gradient-to-r from-pink-200 via-white to-pink-200 shadow-inner border border-pink-200 flex items-center justify-around px-3">
-                      <span>🍬</span>
-                      <span>🌸</span>
-                      <span>🍬</span>
-                    </div>
-                    <div className="w-48 h-14 bg-gradient-to-r from-rose-400 via-pink-300 to-rose-400 rounded-b-2xl shadow-md border border-rose-300 flex items-center justify-around px-4">
-                      <span>🧁</span>
-                      <span>🎀</span>
-                      <span>🧁</span>
-                    </div>
-                  </div>
-                )}
+              <div className="relative w-52 flex items-center justify-center">
+                <div
+                  className={`w-24 h-24 bg-rose-300 border-2 border-rose-400 rounded-l-2xl shadow-md transition-all duration-700 flex items-center justify-center text-2xl ${
+                    cakeCut ? "-translate-x-6 rotate-[-6deg]" : ""
+                  }`}
+                >
+                  🍓
+                </div>
+                <div
+                  className={`w-24 h-24 bg-rose-300 border-2 border-rose-400 rounded-r-2xl shadow-md transition-all duration-700 flex items-center justify-center text-2xl ${
+                    cakeCut ? "translate-x-6 rotate-[6deg]" : ""
+                  }`}
+                >
+                  🍰
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCakeCut(true)}
+                  className={`absolute -top-12 z-20 text-4xl p-2 cursor-pointer transition-all duration-500 hover:scale-125 ${
+                    cakeCut ? "translate-y-12 opacity-0 pointer-events-none" : "animate-bounce"
+                  }`}
+                  title="Click to cut cake"
+                >
+                  🔪
+                </button>
               </div>
 
-              <div className="w-56 h-3 bg-stone-200/90 rounded-full mt-1 border border-stone-300 shadow-sm" />
-              {!cakeCut && (
-                <div className="absolute bottom-3 text-xs text-pink-500 font-medium flex items-center gap-1 animate-pulse">
-                  <span>🔪 Tap anywhere to slice</span>
-                </div>
-              )}
+              <div className="w-60 h-3 bg-amber-100 border border-amber-300 rounded-full mt-1 shadow-sm"></div>
             </div>
 
-            <div className="mt-5 w-full max-w-xs">
-              {cakeCut ? (
+            {cakeCut ? (
+              <div className="flex flex-col items-center page-transition">
+                <p className="text-sm font-semibold text-rose-600 mb-4">You did it! Sweet slice for Madam Ji 🎉</p>
                 <button
-                  onClick={() => {
-                    playChime(650, "sine", 0.4);
-                    setCurrentStep(5);
-                  }}
-                  className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group animate-bounce"
+                  type="button"
+                  onClick={() => setCurrentStep(5)}
+                  className="bg-rose-500 hover:bg-rose-600 text-white font-medium px-8 py-3.5 rounded-full shadow-lg shadow-rose-300 transition transform hover:scale-105"
                 >
-                  <Wand2 className="w-4 h-4" />
-                  <span>Make a wish 🪄</span>
+                  Now, make a wish 🌟
                 </button>
-              ) : (
-                <button
-                  onClick={handleCakeSlice}
-                  className="w-full py-3.5 px-6 rounded-full bg-pink-100 hover:bg-pink-200 text-pink-700 font-semibold text-sm transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Click here to Cut Cake 🔪</span>
-                </button>
-              )}
-            </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCakeCut(true)}
+                className="bg-rose-100 text-rose-700 hover:bg-rose-200 font-semibold px-6 py-2.5 rounded-full text-xs transition border border-rose-300"
+              >
+                Tap knife or Click here to cut 🎂
+              </button>
+            )}
           </div>
         )}
 
-        {/* SCREEN 5: MAKE A WISH */}
+        {/* STEP 5: Make a Wish */}
         {currentStep === 5 && (
-          <div className="w-full flex flex-col items-center text-center animate-fade-in">
-            <div className="relative my-4 flex flex-col items-center justify-center">
-              <div className="w-44 h-44 rounded-full bg-gradient-to-tr from-amber-100 via-pink-100 to-rose-50 flex items-center justify-center shadow-lg border border-pink-200">
-                <span className="text-6xl filter drop-shadow animate-pulse">
-                  🧸🙏✨
-                </span>
-              </div>
-              <div className="flex gap-2 text-xl mt-2 animate-bounce">
-                <span>🎂</span>
-                <span>⭐</span>
-                <span>💖</span>
-              </div>
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-800 mt-2">
-              {wishMade ? "Your wish is on its way ✨" : "Close your eyes..."}
-            </h2>
-            <p className="text-stone-500 text-xs sm:text-sm mt-1 mb-6 max-w-xs">
-              {wishMade 
-                ? "Somewhere, a tiny star just said yes." 
-                : "Make a little wish for the year ahead."
-              }
+          <div className="flex flex-col items-center text-center w-full page-transition">
+            <span className="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-2">
+              Secret Wishes
+            </span>
+            <h2 className="text-2xl font-serif font-bold text-gray-800 mb-2">Make a Wish, Madam Ji</h2>
+            <p className="text-xs text-gray-500 mb-6 max-w-xs">
+              Close your eyes, breathe in all the happiness, and make your deepest wish for the year ahead.
             </p>
 
-            <div className="w-full max-w-xs">
-              <button
-                onClick={handleMakeWish}
-                disabled={wishMade}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
-              >
-                <Star className="w-4 h-4 fill-white text-white group-hover:rotate-45 transition-transform" />
-                <span>{wishMade ? "Sending wish to stars..." : "I made my wish ✨"}</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* SCREEN 6: POLAROID MEMORY GALLERY WITH REAL HOSTED PHOTOS */}
-        {currentStep === 6 && (
-          <div className="w-full flex flex-col items-center text-center animate-fade-in">
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-800 tracking-tight">
-              Some moments are worth keeping forever.
-            </h2>
-            <p className="text-stone-500 text-xs sm:text-sm mt-1 mb-4 max-w-xs">
-              Here's to all the laughs, chaos, late-night talks and little moments.
-            </p>
-
-            {/* Helper tip banner */}
-            <div className="text-[11px] text-pink-700 bg-pink-50/90 border border-pink-200 rounded-full px-3.5 py-1 mb-3.5 flex items-center gap-1.5 shadow-sm">
-              <Camera className="w-3.5 h-3.5 text-pink-500" />
-              <span>Tap any photo to view full size!</span>
-            </div>
-
-            {/* 4 Aesthetic Polaroids Grid with Real Photos */}
-            <div className="grid grid-cols-2 gap-3.5 w-full max-w-sm px-2 mb-4">
-              {polaroids.map((item) => {
-                const currentImgUrl = item.userPhoto || item.imageSrc;
-                return (
-                  <div
-                    key={item.id}
-                    className={`bg-white p-2.5 pb-2.5 rounded-2xl shadow-md hover:shadow-xl transition-all border border-stone-200/90 flex flex-col items-center group relative cursor-pointer ${item.rotation}`}
-                    onClick={() => setActiveZoomPhoto(item)}
-                  >
-                    {/* Polaroid Pin / Tape aesthetic */}
-                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-3.5 bg-amber-200/60 backdrop-blur-xs rounded-xs border-b border-amber-300/40 rotate-1 z-20 pointer-events-none" />
-
-                    {/* Photo frame */}
-                    <div className="w-full aspect-square rounded-xl overflow-hidden relative bg-stone-100 flex items-center justify-center border border-stone-100 shadow-inner">
-                      <img
-                        src={currentImgUrl}
-                        alt={item.caption}
-                        loading="eager"
-                        crossOrigin="anonymous"
-                        onError={(e) => {
-                          // Fallback to direct page embed resolver if CDN hotlink blocks
-                          if (e.target.src !== item.pageUrl) {
-                            e.target.src = `https://images.weserv.nl/?url=${encodeURIComponent(item.imageSrc)}`;
-                          }
-                        }}
-                        className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                      />
-
-                      {/* Zoom Indicator */}
-                      <div className="absolute bottom-1.5 right-1.5 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Sparkles className="w-3 h-3 text-yellow-300" />
-                      </div>
-                    </div>
-
-                    {/* Caption */}
-                    <div className="mt-2 text-stone-800 font-serif italic text-xs tracking-tight text-center font-medium">
-                      {item.caption}
-                    </div>
-
-                    {/* Optional Replace / Upload Button */}
-                    <div className="mt-1.5 w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                      <label 
-                        htmlFor={`photo-upload-${item.id}`}
-                        className="w-full flex items-center justify-center gap-1 bg-pink-50/70 hover:bg-pink-100 text-pink-700 border border-pink-200/60 rounded-lg py-1 px-2 text-[10px] font-semibold cursor-pointer active:scale-95 transition-all shadow-xs"
-                      >
-                        <Upload className="w-3 h-3 text-pink-500" />
-                        <span>Change Photo</span>
-                        <input
-                          id={`photo-upload-${item.id}`}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handlePhotoUpload(e, item.id)}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Read Letter Button */}
-            <div className="w-full max-w-xs mt-2">
-              <button
-                onClick={() => {
-                  playChime(620, "sine", 0.4);
-                  setCurrentStep(7);
-                }}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
-              >
-                <Mail className="w-4 h-4" />
-                <span>Read your letter 💌</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* FULL PHOTO ZOOM MODAL */}
-        {activeZoomPhoto && (
-          <div 
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in"
-            onClick={() => setActiveZoomPhoto(null)}
-          >
-            <div 
-              className="bg-white p-3 pb-4 rounded-3xl max-w-xs w-full shadow-2xl flex flex-col items-center relative animate-scale-up"
-              onClick={(e) => e.stopPropagation()}
+            <div
+              onClick={() => setWishMade(true)}
+              className={`w-44 h-44 rounded-full flex items-center justify-center text-7xl cursor-pointer transition-all duration-500 mb-8 border-4 ${
+                wishMade
+                  ? "bg-amber-100 border-amber-400 shadow-xl shadow-amber-200 scale-105 animate-glow"
+                  : "bg-rose-50 border-dashed border-rose-300 hover:scale-105 animate-pulse"
+              }`}
             >
-              <button
-                onClick={() => setActiveZoomPhoto(null)}
-                className="absolute top-2 right-2 bg-stone-100 hover:bg-stone-200 text-stone-700 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shadow transition-all"
-              >
-                ✕
-              </button>
-              <div className="w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-inner mt-4 bg-stone-100">
-                <img
-                  src={activeZoomPhoto.userPhoto || activeZoomPhoto.imageSrc}
-                  alt={activeZoomPhoto.caption}
-                  className="w-full h-full object-cover object-center"
-                />
-              </div>
-              <p className="mt-3 font-serif font-bold text-stone-800 text-base">
-                {activeZoomPhoto.caption}
-              </p>
-              <p className="text-pink-600 text-xs font-medium">
-                {activeZoomPhoto.tag}
-              </p>
+              {wishMade ? "🌟✨" : "✨🙏"}
             </div>
+
+            {wishMade ? (
+              <div className="flex flex-col items-center page-transition">
+                <p className="text-xs font-serif text-amber-700 mb-6 max-w-xs italic">
+                  "Your wish is on its way. Somewhere, a tiny star just whispered yes."
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(6)}
+                  className="bg-rose-500 hover:bg-rose-600 text-white font-medium px-8 py-3.5 rounded-full shadow-lg shadow-rose-300 transition transform hover:scale-105"
+                >
+                  View your special memories 📸
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setWishMade(true)}
+                className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-semibold px-8 py-3.5 rounded-full shadow-md shadow-amber-200 transition transform hover:scale-105"
+              >
+                I made my wish ✨
+              </button>
+            )}
           </div>
         )}
 
-        {/* SCREEN 7: THE HEARTFELT LETTER */}
+        {/* STEP 6: Polaroids */}
+        {currentStep === 6 && (
+          <div className="flex flex-col items-center text-center w-full page-transition">
+            <span className="text-xs font-semibold tracking-widest uppercase text-rose-400 mb-1">
+              Little Moments
+            </span>
+            <h2 className="text-2xl font-serif font-bold text-gray-800 mb-2">Precious Polaroids</h2>
+            <p className="text-xs text-gray-500 mb-6">Every picture tells a story of you.</p>
+
+            <div className="grid grid-cols-2 gap-4 w-full mb-8">
+              {photos.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => setSelectedPhoto(item.url)}
+                  className={`bg-white p-3 pb-4 rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 border border-gray-100 cursor-pointer flex flex-col items-center ${item.rotation} hover:rotate-0 hover:scale-105 relative group`}
+                >
+                  <div className="w-full aspect-square bg-rose-50 rounded-lg overflow-hidden border border-gray-100 relative">
+                    <img
+                      src={item.url}
+                      alt={item.title}
+                      className="w-full h-full object-cover object-center transition duration-500 group-hover:scale-110"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src !== item.proxyUrl) {
+                          target.src = item.proxyUrl;
+                        }
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={(e) => triggerUpload(item.id, e)}
+                      className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full shadow backdrop-blur-sm transition"
+                      title="Upload custom photo"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <p className="text-[12px] font-serif font-bold text-gray-800 mt-3">{item.title}</p>
+                  <p className="text-[10px] text-gray-400 leading-tight">{item.subtitle}</p>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentStep(7)}
+              className="bg-rose-500 hover:bg-rose-600 text-white font-medium px-8 py-3.5 rounded-full shadow-lg shadow-rose-300 transition transform hover:scale-105"
+            >
+              Read your letter 💌
+            </button>
+          </div>
+        )}
+
+        {/* STEP 7: Letter */}
         {currentStep === 7 && (
-          <div className="w-full flex flex-col items-center animate-fade-in">
-            <div className="w-full max-w-sm bg-[#fffaf5] border border-[#f0dfce] rounded-3xl p-6 sm:p-7 shadow-2xl relative overflow-hidden text-left mb-6">
-              <div className="border-b border-pink-100 pb-3 mb-4 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-pink-400 tracking-widest block">
-                    a letter, just for you
-                  </span>
-                  <h3 className="text-xl font-serif font-bold text-stone-800">
-                    For you, Madam Ji 🌸
-                  </h3>
-                </div>
-                <div className="text-2xl">💌</div>
+          <div className="flex flex-col items-center w-full page-transition">
+            <div className="w-full bg-[#FFFDF9] border border-amber-200/80 rounded-2xl shadow-xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-rose-100 rounded-bl-full opacity-40 pointer-events-none"></div>
+
+              <div className="flex items-center gap-2 mb-4">
+                <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+                <span className="text-xs uppercase tracking-widest text-rose-400 font-semibold">
+                  From the Heart
+                </span>
               </div>
 
-              <div className="space-y-3.5 text-stone-700 font-serif text-xs sm:text-[13px] leading-relaxed">
-                <p className="first-letter:text-2xl first-letter:font-bold first-letter:text-pink-600 first-letter:mr-0.5">
-                  Happy birthday, you wonderful cutie.
+              <h2 className="text-xl font-serif font-bold text-gray-800 mb-4">Dear Madam Ji,</h2>
+
+              <div className="text-xs text-gray-700 leading-relaxed font-serif space-y-3">
+                <p>
+                  Happy Birthday to the one who brings so much quiet warmth, laughter, and light into every single day.
                 </p>
                 <p>
-                  I wanted to make something that felt a little like you — warm, a bit silly, and full of tiny surprises. So here it is: a small corner of the internet that exists only because you do.
+                  Watching you grow, chase your dreams, and make everyone smile with that effortless grace is truly something special.
                 </p>
                 <p>
-                  Thank you for every late-night talk, every ridiculous inside joke, every time you showed up without being asked. You make ordinary days feel like something worth remembering.
+                  May this <strong>6 November</strong> bring you endless happiness, courage for all your ambitions, and moments that make your heart sparkle just as brightly as you do.
                 </p>
-                <p>
-                  This year, I hope you get the slow mornings, the loud laughs, the good news you've been waiting for, and at least one perfect slice of cake.
+                <p className="font-semibold text-rose-800 pt-2">
+                  Stay as wonderful, stubborn, sweet, and genuine as you are. Always.
                 </p>
-                <p>
-                  Whatever you've wished for back there — I hope it finds you soon. And if it takes a little while, I'll be right here, cheering the loudest.
-                </p>
-                <p className="pt-1 font-semibold text-pink-600">
-                  Happy birthday. Today is all yours.
-                </p>
-                <div className="pt-2 text-right text-stone-500 font-serif italic text-xs">
-                  — Someone Special 💕
-                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-amber-100 flex justify-between items-center text-xs text-gray-400 font-serif">
+                <span>With lots of love & blessings,</span>
+                <span className="font-bold text-gray-700">Forever Yours</span>
               </div>
             </div>
 
-            <div className="w-full max-w-xs">
-              <button
-                onClick={() => {
-                  playConfettiMelody();
-                  setCurrentStep(8);
-                }}
-                className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
-              >
-                <span>One last thing ✨</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setCurrentStep(8)}
+              className="mt-6 bg-rose-500 hover:bg-rose-600 text-white font-medium px-8 py-3.5 rounded-full shadow-lg shadow-rose-300 transition transform hover:scale-105"
+            >
+              Final message 🎈
+            </button>
           </div>
         )}
 
-        {/* SCREEN 8: GRAND FINALE */}
+        {/* STEP 8: Grand Finale */}
         {currentStep === 8 && (
-          <div className="w-full flex flex-col items-center text-center animate-fade-in">
-            <div className="flex gap-2 text-2xl mb-2 animate-bounce">
-              <span>🎉</span>
-              <span>🎂</span>
-              <span>✨</span>
-              <span>🎈</span>
-              <span>💖</span>
+          <div className="flex flex-col items-center text-center w-full page-transition">
+            <div className="text-8xl animate-float mb-4">
+              🎉🧸🎁
             </div>
 
-            <div className="relative my-4 flex flex-col items-center">
-              <div className="text-5xl animate-bounce filter drop-shadow mb-1" style={{ animationDuration: "2s" }}>
-                🎈
-              </div>
-              <div className="w-0.5 h-6 bg-stone-300 -mt-2 mb-0.5" />
-              <div className="w-40 h-40 rounded-full bg-pink-100 flex items-center justify-center border-4 border-white shadow-xl relative">
-                <span className="text-7xl filter drop-shadow">
-                  🧸
-                </span>
-                <span className="absolute bottom-1 right-2 text-3xl animate-pulse">
-                  💐
-                </span>
-              </div>
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl font-serif font-extrabold text-stone-800 tracking-tight">
-              Happy Birthday, <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-600 via-rose-500 to-purple-600">
-                Madam Ji! 🎂✨
-              </span>
-            </h1>
-
-            <p className="text-stone-600 text-xs sm:text-sm mt-3 mb-1 max-w-xs leading-relaxed font-serif">
-              May this year bring you countless little reasons to smile.
+            <h1 className="text-3xl font-serif font-bold text-gray-800 mb-2">Have the Happiest Year!</h1>
+            <p className="text-xs text-gray-500 max-w-xs mb-8">
+              May every single day be filled with endless reasons to smile. Happy Birthday once again, Madam Ji! ❤️
             </p>
 
-            <p className="text-pink-500 text-xs font-serif italic mb-6">
-              — with love, Someone Special 💝
-            </p>
-
-            <div className="w-full max-w-xs space-y-2">
-              <button
-                onClick={resetAll}
-                className="w-full py-3.5 px-6 rounded-full bg-white border border-pink-200 text-pink-600 font-semibold text-sm shadow-md hover:bg-pink-50 active:scale-95 transition-all flex items-center justify-center gap-2 group"
-              >
-                <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                <span>Replay the surprise ↺</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={resetSurprise}
+              className="flex items-center gap-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 px-6 py-3 rounded-full text-xs font-semibold shadow-sm transition transform hover:scale-105"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Replay the surprise
+            </button>
           </div>
         )}
-
       </main>
 
-      {/* Footer */}
-      <footer className="w-full max-w-md py-4 px-6 text-center text-[11px] text-stone-400 z-10 flex items-center justify-center gap-1">
-        <span>Crafted with</span>
-        <Heart className="w-3 h-3 fill-pink-500 text-pink-500 inline" />
-        <span>for Madam Ji's special day</span>
-      </footer>
-
+      {/* Lightbox Preview */}
+      {selectedPhoto && (
+        <div
+          onClick={() => setSelectedPhoto(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 page-transition"
+        >
+          <div className="relative max-w-md w-full bg-white p-2 rounded-2xl shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setSelectedPhoto(null)}
+              className="absolute top-4 right-4 bg-black/60 text-white p-2 rounded-full hover:bg-black/90 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <img
+              src={selectedPhoto}
+              alt="Enlarged"
+              className="w-full max-h-[80vh] object-contain rounded-xl"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
