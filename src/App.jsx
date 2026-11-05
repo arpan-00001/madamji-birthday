@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   Heart, Sparkles, Cake, Star, Music, Volume2, VolumeX, 
-  Upload, Camera, RefreshCw, ChevronRight, Moon, Lightbulb, 
+  Camera, RefreshCw, ChevronRight, Moon, Lightbulb, 
   PartyPopper, Wand2, Mail, Check, Disc3, Image as ImageIcon, X
 } from "lucide-react";
 
 export default function App() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [showSpotify, setShowSpotify] = useState(true);
+  const [showSpotify, setShowSpotify] = useState(false);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [envelopeOpened, setEnvelopeOpened] = useState(false);
   const [lightsOn, setLightsOn] = useState(false);
   const [cakeCut, setCakeCut] = useState(false);
@@ -15,11 +16,12 @@ export default function App() {
   const [isCutting, setIsCutting] = useState(false);
   const [activeZoomPhoto, setActiveZoomPhoto] = useState(null);
 
-  // Real photos mapped with primary direct CDN link, backup direct link, and web page reference
-  const initialPolaroids = [
+  // Real photos mapped with primary direct CDN link, captions and subtitles
+  const polaroids = [
     {
       id: 1,
       caption: "that sunny picnic 🧺",
+      subtitle: "White SUV adventure & sunny roads",
       tag: "Road Trip by the Car",
       rotation: "-rotate-2",
       imageSrc: "https://i.ibb.co/3YQgJLhB/WhatsApp-Image-2026-11-06-at-00-22-50.jpg",
@@ -28,6 +30,7 @@ export default function App() {
     {
       id: 2,
       caption: "counting stars ✨",
+      subtitle: "Festive celebration & golden smiles",
       tag: "Festive Night Out",
       rotation: "rotate-2",
       imageSrc: "https://i.ibb.co/C3rNJ2qg/WhatsApp-Image-2026-11-06-at-00-26-17.jpeg",
@@ -36,6 +39,7 @@ export default function App() {
     {
       id: 3,
       caption: "the sweetest chaos 🍰",
+      subtitle: "Playful wink & golden hour curls",
       tag: "Cute Wink & Curls",
       rotation: "-rotate-1",
       imageSrc: "https://i.ibb.co/3y1bKtD3/WhatsApp-Image-2026-11-06-at-00-21-29.jpg",
@@ -44,73 +48,13 @@ export default function App() {
     {
       id: 4,
       caption: "top of the world 🎈",
+      subtitle: "Pure elegance & butterfly charm",
       tag: "Butterfly Glow Portrait",
       rotation: "rotate-3",
       imageSrc: "https://i.ibb.co/M4pvGLD/WhatsApp-Image-2026-11-06-at-00-23-33.jpg",
       pageUrl: "https://ibb.co/M4pvGLD"
     }
   ];
-
-  const [polaroids, setPolaroids] = useState(initialPolaroids);
-
-  // Load any user uploaded overrides from local storage if saved
-  useEffect(() => {
-    try {
-      const savedPhotos = localStorage.getItem("madam_ji_photos");
-      if (savedPhotos) {
-        const parsed = JSON.parse(savedPhotos);
-        setPolaroids(prev =>
-          prev.map(p => ({
-            ...p,
-            userPhoto: parsed[p.id] || null
-          }))
-        );
-      }
-    } catch (e) {
-      console.log("Storage check:", e);
-    }
-  }, []);
-
-  // Handle Photo File Upload & save to Base64 in state + localStorage
-  const handlePhotoUpload = (e, id) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64Data = event.target.result;
-      setPolaroids(prev => {
-        const updated = prev.map(p => p.id === id ? { ...p, userPhoto: base64Data } : p);
-        try {
-          const toSave = {};
-          updated.forEach(item => {
-            if (item.userPhoto) toSave[item.id] = item.userPhoto;
-          });
-          localStorage.setItem("madam_ji_photos", JSON.stringify(toSave));
-        } catch (err) {
-          console.log("Could not store image locally:", err);
-        }
-        return updated;
-      });
-      playChime(780, "sine", 0.4);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const removeCustomPhoto = (id, e) => {
-    e.stopPropagation();
-    setPolaroids(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, userPhoto: null } : p);
-      try {
-        const toSave = {};
-        updated.forEach(item => {
-          if (item.userPhoto) toSave[item.id] = item.userPhoto;
-        });
-        localStorage.setItem("madam_ji_photos", JSON.stringify(toSave));
-      } catch (err) {}
-      return updated;
-    });
-  };
 
   // Audio synthesizer for cute sound effects using Web Audio API
   const playChime = (freq = 520, type = "sine", duration = 0.4) => {
@@ -148,10 +92,14 @@ export default function App() {
     });
   };
 
-  // Screen 1: Open Envelope
+  // Screen 1: Open Envelope & Trigger Background Music
   const handleEnvelopeClick = () => {
     playChime(440, "triangle", 0.3);
     setEnvelopeOpened(true);
+    // Envelope click karte hi music widget active aur gana autoplay start
+    setShowSpotify(true);
+    setIsMusicPlaying(true);
+
     setTimeout(() => {
       playChime(660, "sine", 0.5);
       setCurrentStep(2);
@@ -226,22 +174,24 @@ export default function App() {
           <span>Birthday Surprise</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Spotify Player Toggle Button */}
-          <button
-            onClick={() => setShowSpotify(!showSpotify)}
-            title="Music Player"
-            className="flex items-center gap-1 text-[11px] font-semibold text-pink-700 bg-pink-100/90 hover:bg-pink-200 border border-pink-200 px-2.5 py-1 rounded-full shadow-sm transition-all"
-          >
-            <Disc3 className="w-3.5 h-3.5 animate-spin text-pink-600" />
-            <span>Music</span>
-          </button>
+          {/* Spotify Player Toggle Button (visible once music starts) */}
+          {isMusicPlaying && (
+            <button
+              onClick={() => setShowSpotify(!showSpotify)}
+              title="Music Player"
+              className="flex items-center gap-1 text-[11px] font-semibold text-pink-700 bg-pink-100/90 hover:bg-pink-200 border border-pink-200 px-2.5 py-1 rounded-full shadow-sm transition-all"
+            >
+              <Disc3 className="w-3.5 h-3.5 animate-spin text-pink-600" />
+              <span>{showSpotify ? "Hide Player" : "Music 🎵"}</span>
+            </button>
+          )}
           <span className="text-[11px] font-semibold text-stone-400 bg-white/70 backdrop-blur px-2.5 py-1 rounded-full border border-stone-200 shadow-sm">
             Step {currentStep} / 8
           </span>
         </div>
       </header>
 
-      {/* Floating Spotify Player */}
+      {/* Floating Spotify Player with Autoplay */}
       {showSpotify && (
         <div className="w-full max-w-md px-4 mt-2 z-20 transition-all duration-300">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-pink-100 flex flex-col gap-1">
@@ -258,7 +208,7 @@ export default function App() {
             </div>
             <iframe 
               style={{ borderRadius: "12px" }} 
-              src="https://open.spotify.com/embed/track/0uROb6x5IunKokDggpmwKz?utm_source=generator&theme=0" 
+              src="https://open.spotify.com/embed/track/0uROb6x5IunKokDggpmwKz?utm_source=generator&theme=0&autoplay=1" 
               width="100%" 
               height="80" 
               frameBorder="0" 
@@ -599,70 +549,53 @@ export default function App() {
 
             {/* Helper tip banner */}
             <div className="text-[11px] text-pink-700 bg-pink-50/90 border border-pink-200 rounded-full px-3.5 py-1 mb-3.5 flex items-center gap-1.5 shadow-sm">
-              <Camera className="w-3.5 h-3.5 text-pink-500" />
+              <Sparkles className="w-3.5 h-3.5 text-pink-500" />
               <span>Tap any photo to view full size!</span>
             </div>
 
-            {/* 4 Aesthetic Polaroids Grid with Real Photos */}
+            {/* 4 Aesthetic Polaroids Grid with Real Photos, Captions & Subtitles */}
             <div className="grid grid-cols-2 gap-3.5 w-full max-w-sm px-2 mb-4">
-              {polaroids.map((item) => {
-                const currentImgUrl = item.userPhoto || item.imageSrc;
-                return (
-                  <div
-                    key={item.id}
-                    className={`bg-white p-2.5 pb-2.5 rounded-2xl shadow-md hover:shadow-xl transition-all border border-stone-200/90 flex flex-col items-center group relative cursor-pointer ${item.rotation}`}
-                    onClick={() => setActiveZoomPhoto(item)}
-                  >
-                    {/* Polaroid Pin / Tape aesthetic */}
-                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-3.5 bg-amber-200/60 backdrop-blur-xs rounded-xs border-b border-amber-300/40 rotate-1 z-20 pointer-events-none" />
+              {polaroids.map((item) => (
+                <div
+                  key={item.id}
+                  className={`bg-white p-2.5 pb-3 rounded-2xl shadow-md hover:shadow-xl transition-all border border-stone-200/90 flex flex-col items-center group relative cursor-pointer ${item.rotation}`}
+                  onClick={() => setActiveZoomPhoto(item)}
+                >
+                  {/* Polaroid Pin / Tape aesthetic */}
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-3.5 bg-amber-200/60 backdrop-blur-xs rounded-xs border-b border-amber-300/40 rotate-1 z-20 pointer-events-none" />
 
-                    {/* Photo frame */}
-                    <div className="w-full aspect-square rounded-xl overflow-hidden relative bg-stone-100 flex items-center justify-center border border-stone-100 shadow-inner">
-                      <img
-                        src={currentImgUrl}
-                        alt={item.caption}
-                        loading="eager"
-                        crossOrigin="anonymous"
-                        onError={(e) => {
-                          // Fallback to direct page embed resolver if CDN hotlink blocks
-                          if (e.target.src !== item.pageUrl) {
-                            e.target.src = `https://images.weserv.nl/?url=${encodeURIComponent(item.imageSrc)}`;
-                          }
-                        }}
-                        className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                      />
+                  {/* Photo frame */}
+                  <div className="w-full aspect-square rounded-xl overflow-hidden relative bg-stone-100 flex items-center justify-center border border-stone-100 shadow-inner">
+                    <img
+                      src={item.imageSrc}
+                      alt={item.caption}
+                      loading="eager"
+                      onError={(e) => {
+                        const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(item.imageSrc)}`;
+                        if (e.target.src !== weservUrl) {
+                          e.target.src = weservUrl;
+                        }
+                      }}
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                    />
 
-                      {/* Zoom Indicator */}
-                      <div className="absolute bottom-1.5 right-1.5 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Sparkles className="w-3 h-3 text-yellow-300" />
-                      </div>
-                    </div>
-
-                    {/* Caption */}
-                    <div className="mt-2 text-stone-800 font-serif italic text-xs tracking-tight text-center font-medium">
-                      {item.caption}
-                    </div>
-
-                    {/* Optional Replace / Upload Button */}
-                    <div className="mt-1.5 w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                      <label 
-                        htmlFor={`photo-upload-${item.id}`}
-                        className="w-full flex items-center justify-center gap-1 bg-pink-50/70 hover:bg-pink-100 text-pink-700 border border-pink-200/60 rounded-lg py-1 px-2 text-[10px] font-semibold cursor-pointer active:scale-95 transition-all shadow-xs"
-                      >
-                        <Upload className="w-3 h-3 text-pink-500" />
-                        <span>Change Photo</span>
-                        <input
-                          id={`photo-upload-${item.id}`}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handlePhotoUpload(e, item.id)}
-                        />
-                      </label>
+                    {/* Zoom Indicator */}
+                    <div className="absolute bottom-1.5 right-1.5 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Sparkles className="w-3 h-3 text-yellow-300" />
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Caption */}
+                  <div className="mt-2 text-stone-800 font-serif italic text-xs tracking-tight text-center font-bold">
+                    {item.caption}
+                  </div>
+
+                  {/* Subtitle / Description */}
+                  <div className="mt-0.5 text-[10px] text-stone-400 font-sans tracking-tight text-center leading-tight">
+                    {item.subtitle}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Read Letter Button */}
@@ -699,7 +632,7 @@ export default function App() {
               </button>
               <div className="w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-inner mt-4 bg-stone-100">
                 <img
-                  src={activeZoomPhoto.userPhoto || activeZoomPhoto.imageSrc}
+                  src={activeZoomPhoto.imageSrc}
                   alt={activeZoomPhoto.caption}
                   className="w-full h-full object-cover object-center"
                 />
@@ -708,7 +641,7 @@ export default function App() {
                 {activeZoomPhoto.caption}
               </p>
               <p className="text-pink-600 text-xs font-medium">
-                {activeZoomPhoto.tag}
+                {activeZoomPhoto.subtitle}
               </p>
             </div>
           </div>
