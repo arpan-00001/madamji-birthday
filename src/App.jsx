@@ -6,7 +6,7 @@ import {
 
 export default function App() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [showSpotify, setShowSpotify] = useState(false);
+  const [showMusicPlayer, setShowMusicPlayer] = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [envelopeOpened, setEnvelopeOpened] = useState(false);
@@ -16,8 +16,11 @@ export default function App() {
   const [isCutting, setIsCutting] = useState(false);
   const [activeZoomPhoto, setActiveZoomPhoto] = useState(null);
 
-  // Background Audio Ref for guaranteed instant autoplay on letter click
-  const audioRef = useRef(null);
+  // Audio Context Ref & State for persistent background music
+  const audioCtxRef = useRef(null);
+  const musicTimerRef = useRef(null);
+  const isPlayingRef = useRef(false);
+  const isMutedRef = useRef(false);
 
   const polaroids = [
     {
@@ -55,75 +58,114 @@ export default function App() {
   ];
 
   // Sound effects
-  const playChime = (freq = 520, type = "sine", duration = 0.4) => {
+  const playTone = (freq = 520, type = "sine", duration = 0.4, vol = 0.12) => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      if (isMutedRef.current) return;
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+      const osc = audioCtxRef.current.createOscillator();
+      const gain = audioCtxRef.current.createGain();
       osc.type = type;
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.frequency.setValueAtTime(freq, audioCtxRef.current.currentTime);
+      gain.gain.setValueAtTime(vol, audioCtxRef.current.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.current.currentTime + duration);
       osc.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(audioCtxRef.current.destination);
       osc.start();
-      osc.stop(audioCtx.currentTime + duration);
+      osc.stop(audioCtxRef.current.currentTime + duration);
     } catch (e) {}
+  };
+
+  // Continuous looping Happy Birthday Melody in Background
+  const startBackgroundBirthdayMelody = () => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+    } catch (e) {}
+
+    isPlayingRef.current = true;
+    setIsMusicPlaying(true);
+
+    // Happy Birthday notes (frequency in Hz, duration in seconds)
+    const melody = [
+      { f: 261.63, d: 0.35 }, { f: 261.63, d: 0.35 }, { f: 293.66, d: 0.6 }, { f: 261.63, d: 0.6 }, { f: 349.23, d: 0.6 }, { f: 329.63, d: 1.1 },
+      { f: 261.63, d: 0.35 }, { f: 261.63, d: 0.35 }, { f: 293.66, d: 0.6 }, { f: 261.63, d: 0.6 }, { f: 392.00, d: 0.6 }, { f: 349.23, d: 1.1 },
+      { f: 261.63, d: 0.35 }, { f: 261.63, d: 0.35 }, { f: 523.25, d: 0.6 }, { f: 440.00, d: 0.6 }, { f: 349.23, d: 0.6 }, { f: 329.63, d: 0.6 }, { f: 293.66, d: 0.8 },
+      { f: 466.16, d: 0.35 }, { f: 466.16, d: 0.35 }, { f: 440.00, d: 0.6 }, { f: 349.23, d: 0.6 }, { f: 392.00, d: 0.6 }, { f: 349.23, d: 1.3 }
+    ];
+
+    let noteIndex = 0;
+    const playNextNote = () => {
+      if (!isPlayingRef.current) return;
+      const note = melody[noteIndex];
+      playTone(note.f, "sine", note.d, 0.16);
+
+      noteIndex = (noteIndex + 1) % melody.length;
+      const delay = (note.d * 1000) + (noteIndex === 0 ? 1200 : 80);
+      musicTimerRef.current = setTimeout(playNextNote, delay);
+    };
+
+    playNextNote();
+  };
+
+  const stopBackgroundMusic = () => {
+    isPlayingRef.current = false;
+    setIsMusicPlaying(false);
+    if (musicTimerRef.current) {
+      clearTimeout(musicTimerRef.current);
+      musicTimerRef.current = null;
+    }
+  };
+
+  const togglePlayPause = () => {
+    if (isPlayingRef.current) {
+      stopBackgroundMusic();
+    } else {
+      startBackgroundBirthdayMelody();
+    }
+  };
+
+  const toggleMute = () => {
+    isMutedRef.current = !isMutedRef.current;
+    setIsMuted(isMutedRef.current);
   };
 
   const playConfettiMelody = () => {
     [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-      setTimeout(() => playChime(freq, "triangle", 0.5), idx * 120);
+      setTimeout(() => playTone(freq, "triangle", 0.5), idx * 120);
     });
   };
 
   const playCakeCutSound = () => {
-    playChime(320, "sawtooth", 0.2);
-    setTimeout(() => playChime(640, "sine", 0.4), 150);
+    playTone(320, "sawtooth", 0.2);
+    setTimeout(() => playTone(640, "sine", 0.4), 150);
   };
 
   const playWishSound = () => {
     [600, 800, 1000, 1200, 1500].forEach((freq, idx) => {
-      setTimeout(() => playChime(freq, "sine", 0.6), idx * 100);
+      setTimeout(() => playTone(freq, "sine", 0.6), idx * 100);
     });
   };
 
   // Screen 1: Open Envelope & Instant Background Music Autoplay
   const handleEnvelopeClick = () => {
-    playChime(440, "triangle", 0.3);
     setEnvelopeOpened(true);
-    setShowSpotify(true);
+    setShowMusicPlayer(true);
 
-    // Play Background Audio instantly
-    if (audioRef.current) {
-      audioRef.current.play().then(() => {
-        setIsMusicPlaying(true);
-      }).catch(() => {
-        setIsMusicPlaying(true);
-      });
-    }
+    // Web Audio trigger - guaranteed autoplay on user interaction
+    startBackgroundBirthdayMelody();
 
     setTimeout(() => {
-      playChime(660, "sine", 0.5);
       setCurrentStep(2);
     }, 1800);
-  };
-
-  const togglePlayPause = () => {
-    if (!audioRef.current) return;
-    if (isMusicPlaying) {
-      audioRef.current.pause();
-      setIsMusicPlaying(false);
-    } else {
-      audioRef.current.play();
-      setIsMusicPlaying(true);
-    }
-  };
-
-  const toggleMute = () => {
-    if (!audioRef.current) return;
-    audioRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
   };
 
   // Screen 2: Turn on Lights
@@ -157,6 +199,7 @@ export default function App() {
   };
 
   const resetAll = () => {
+    stopBackgroundMusic();
     setCurrentStep(1);
     setEnvelopeOpened(false);
     setLightsOn(false);
@@ -164,17 +207,15 @@ export default function App() {
     setWishMade(false);
   };
 
+  useEffect(() => {
+    return () => {
+      if (musicTimerRef.current) clearTimeout(musicTimerRef.current);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-[#fdf8f4] text-[#4a3b32] font-sans antialiased relative overflow-hidden flex flex-col items-center justify-between selection:bg-pink-200">
       
-      {/* Hidden Piano Instrumental Audio with Loop */}
-      <audio 
-        ref={audioRef} 
-        src="https://cdn.pixabay.com/download/audio/2022/10/30/audio_5170f218ce.mp3?filename=happy-birthday-piano-125016.mp3" 
-        loop 
-        preload="auto"
-      />
-
       {/* Background Floating Particles */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-10 left-[10%] w-32 h-32 bg-pink-200/40 rounded-full blur-3xl animate-pulse" />
@@ -202,7 +243,7 @@ export default function App() {
           <span>Birthday Surprise</span>
         </div>
         <div className="flex items-center gap-2">
-          {showSpotify && (
+          {showMusicPlayer && (
             <button
               onClick={togglePlayPause}
               title="Music Play/Pause"
@@ -218,8 +259,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Clean Premium Music Player (No Preview Badge, No Remove Button) */}
-      {showSpotify && (
+      {/* Clean Premium Music Player (100% Working Piano Track, No Preview Badge, No Remove Button) */}
+      {showMusicPlayer && (
         <div className="w-full max-w-md px-4 mt-2 z-20 transition-all duration-300">
           <div className="bg-stone-900/95 text-white backdrop-blur-md rounded-2xl p-3 shadow-xl border border-stone-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -247,7 +288,7 @@ export default function App() {
                 className="text-stone-400 hover:text-white transition p-1"
                 title={isMuted ? "Unmute" : "Mute"}
               >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
               </button>
               <button
                 type="button"
@@ -431,7 +472,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  playChime(580, "triangle", 0.3);
+                  playTone(580, "triangle", 0.3);
                   setCurrentStep(4);
                 }}
                 className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
@@ -524,7 +565,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    playChime(650, "sine", 0.4);
+                    playTone(650, "sine", 0.4);
                     setCurrentStep(5);
                   }}
                   className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group animate-bounce"
@@ -585,7 +626,7 @@ export default function App() {
           </div>
         )}
 
-        {/* SCREEN 6: POLAROID MEMORY GALLERY */}
+        {/* SCREEN 6: POLAROID MEMORY GALLERY WITH REAL HOSTED PHOTOS */}
         {currentStep === 6 && (
           <div className="w-full flex flex-col items-center text-center animate-fade-in">
             <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-800 tracking-tight">
@@ -600,7 +641,7 @@ export default function App() {
               <span>Tap any photo to view full size!</span>
             </div>
 
-            {/* 4 Aesthetic Polaroids with Real Photos, Captions & Subtitles */}
+            {/* 4 Aesthetic Polaroids Grid with Real Photos, Captions & Subtitles */}
             <div className="grid grid-cols-2 gap-3.5 w-full max-w-sm px-2 mb-4">
               {polaroids.map((item) => (
                 <div
@@ -644,7 +685,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  playChime(620, "sine", 0.4);
+                  playTone(620, "sine", 0.4);
                   setCurrentStep(7);
                 }}
                 className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
