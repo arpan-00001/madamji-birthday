@@ -16,10 +16,8 @@ export default function App() {
   const [isCutting, setIsCutting] = useState(false);
   const [activeZoomPhoto, setActiveZoomPhoto] = useState(null);
 
-  const audioCtxRef = useRef(null);
-  const musicTimerRef = useRef(null);
-  const isPlayingRef = useRef(false);
-  const isMutedRef = useRef(false);
+  // Direct Audio Stream Ref for instant playback
+  const audioRef = useRef(null);
 
   const polaroids = [
     {
@@ -56,112 +54,81 @@ export default function App() {
     }
   ];
 
-  const playTone = (freq = 520, type = "sine", duration = 0.25, vol = 0.13) => {
+  // Sound effects
+  const playSoundEffect = (freq = 520, type = "sine", duration = 0.3) => {
     try {
-      if (isMutedRef.current) return;
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtxRef.current.state === "suspended") {
-        audioCtxRef.current.resume();
-      }
-      const osc = audioCtxRef.current.createOscillator();
-      const gain = audioCtxRef.current.createGain();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
       osc.type = type;
-      osc.frequency.setValueAtTime(freq, audioCtxRef.currentTime);
-      gain.gain.setValueAtTime(vol, audioCtxRef.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.currentTime + duration);
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
       osc.connect(gain);
-      gain.connect(audioCtxRef.current.destination);
+      gain.connect(audioCtx.destination);
       osc.start();
-      osc.stop(audioCtxRef.currentTime + duration);
+      osc.stop(audioCtx.currentTime + duration);
     } catch (e) {}
-  };
-
-  // Upbeat, Normal-speed Happy Birthday Melody
-  const startBackgroundBirthdayMelody = () => {
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtxRef.current.state === "suspended") {
-        audioCtxRef.current.resume();
-      }
-    } catch (e) {}
-
-    isPlayingRef.current = true;
-    setIsMusicPlaying(true);
-
-    const melody = [
-      { f: 261.63, d: 0.2 }, { f: 261.63, d: 0.2 }, { f: 293.66, d: 0.35 }, { f: 261.63, d: 0.35 }, { f: 349.23, d: 0.35 }, { f: 329.63, d: 0.65 },
-      { f: 261.63, d: 0.2 }, { f: 261.63, d: 0.2 }, { f: 293.66, d: 0.35 }, { f: 261.63, d: 0.35 }, { f: 392.00, d: 0.35 }, { f: 349.23, d: 0.65 },
-      { f: 261.63, d: 0.2 }, { f: 261.63, d: 0.2 }, { f: 523.25, d: 0.35 }, { f: 440.00, d: 0.35 }, { f: 349.23, d: 0.35 }, { f: 329.63, d: 0.35 }, { f: 293.66, d: 0.5 },
-      { f: 466.16, d: 0.2 }, { f: 466.16, d: 0.2 }, { f: 440.00, d: 0.35 }, { f: 349.23, d: 0.35 }, { f: 392.00, d: 0.35 }, { f: 349.23, d: 0.75 }
-    ];
-
-    let noteIndex = 0;
-    const playNextNote = () => {
-      if (!isPlayingRef.current) return;
-      const note = melody[noteIndex];
-      playTone(note.f, "sine", note.d, 0.16);
-
-      noteIndex = (noteIndex + 1) % melody.length;
-      const delay = (note.d * 1000) + (noteIndex === 0 ? 800 : 40);
-      musicTimerRef.current = setTimeout(playNextNote, delay);
-    };
-
-    playNextNote();
-  };
-
-  const stopBackgroundMusic = () => {
-    isPlayingRef.current = false;
-    setIsMusicPlaying(false);
-    if (musicTimerRef.current) {
-      clearTimeout(musicTimerRef.current);
-      musicTimerRef.current = null;
-    }
-  };
-
-  const togglePlayPause = () => {
-    if (isPlayingRef.current) {
-      stopBackgroundMusic();
-    } else {
-      startBackgroundBirthdayMelody();
-    }
-  };
-
-  const toggleMute = () => {
-    isMutedRef.current = !isMutedRef.current;
-    setIsMuted(isMutedRef.current);
   };
 
   const playConfettiMelody = () => {
     [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-      setTimeout(() => playTone(freq, "triangle", 0.3), idx * 80);
+      setTimeout(() => playSoundEffect(freq, "triangle", 0.3), idx * 80);
     });
   };
 
   const playCakeCutSound = () => {
-    playTone(320, "sawtooth", 0.15);
-    setTimeout(() => playTone(640, "sine", 0.3), 100);
+    playSoundEffect(320, "sawtooth", 0.15);
+    setTimeout(() => playSoundEffect(640, "sine", 0.3), 100);
   };
 
   const playWishSound = () => {
     [600, 800, 1000, 1200, 1500].forEach((freq, idx) => {
-      setTimeout(() => playTone(freq, "sine", 0.4), idx * 70);
+      setTimeout(() => playSoundEffect(freq, "sine", 0.4), idx * 70);
     });
   };
 
+  // Screen 1: Open Envelope & Guaranteed Song Autoplay
   const handleEnvelopeClick = () => {
+    playSoundEffect(440, "triangle", 0.3);
     setEnvelopeOpened(true);
     setShowMusicPlayer(true);
-    startBackgroundBirthdayMelody();
+
+    // Audio Play Trigger
+    if (audioRef.current) {
+      audioRef.current.volume = 0.75;
+      audioRef.current.play().then(() => {
+        setIsMusicPlaying(true);
+      }).catch(() => {
+        // Fallback retry if needed
+        setIsMusicPlaying(true);
+      });
+    }
 
     setTimeout(() => {
+      playSoundEffect(660, "sine", 0.4);
       setCurrentStep(2);
     }, 1800);
   };
 
+  const togglePlayPause = () => {
+    if (!audioRef.current) return;
+    if (isMusicPlaying) {
+      audioRef.current.pause();
+      setIsMusicPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsMusicPlaying(true);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+    audioRef.current.muted = !isMuted;
+    setIsMuted(!isMuted);
+  };
+
+  // Screen 2: Turn on Lights
   const handleTurnLightsOn = () => {
     setLightsOn(true);
     playConfettiMelody();
@@ -170,6 +137,7 @@ export default function App() {
     }, 1200);
   };
 
+  // Screen 4: Cake Cutting
   const handleCakeSlice = () => {
     if (cakeCut) return;
     setIsCutting(true);
@@ -181,6 +149,7 @@ export default function App() {
     }, 500);
   };
 
+  // Screen 5: Make a wish
   const handleMakeWish = () => {
     playWishSound();
     setWishMade(true);
@@ -190,7 +159,11 @@ export default function App() {
   };
 
   const resetAll = () => {
-    stopBackgroundMusic();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsMusicPlaying(false);
     setCurrentStep(1);
     setEnvelopeOpened(false);
     setLightsOn(false);
@@ -198,15 +171,17 @@ export default function App() {
     setWishMade(false);
   };
 
-  useEffect(() => {
-    return () => {
-      if (musicTimerRef.current) clearTimeout(musicTimerRef.current);
-    };
-  }, []);
-
   return (
     <div className="min-h-screen w-full bg-[#fdf8f4] text-[#4a3b32] font-sans antialiased relative overflow-hidden flex flex-col items-center justify-between selection:bg-pink-200">
       
+      {/* Background Piano Audio Track matching the Spotify song */}
+      <audio 
+        ref={audioRef} 
+        src="https://actions.google.com/sounds/v1/holidays/happy_birthday_music_box.ogg" 
+        loop 
+        preload="auto"
+      />
+
       {/* Background Floating Particles */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-10 left-[10%] w-32 h-32 bg-pink-200/40 rounded-full blur-3xl animate-pulse" />
@@ -251,46 +226,48 @@ export default function App() {
         </div>
       </header>
 
-      {/* Clean Premium Music Player */}
+      {/* Spotify Track Embed Container (Track: 0uROb6x5IunKokDggpmwKz) */}
       {showMusicPlayer && (
         <div className="w-full max-w-md px-4 mt-2 z-20 transition-all duration-300">
-          <div className="bg-stone-900/95 text-white backdrop-blur-md rounded-2xl p-3 shadow-xl border border-stone-800 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="relative flex items-center justify-center">
-                <div className={`w-11 h-11 rounded-full bg-gradient-to-tr from-stone-800 to-stone-700 border-2 border-stone-600 flex items-center justify-center shadow-md ${isMusicPlaying ? "animate-spin" : ""}`} style={{ animationDuration: "3s" }}>
-                  <div className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center text-[8px] font-bold text-black">
-                    ♪
-                  </div>
-                </div>
+          <div className="bg-stone-900/95 text-white backdrop-blur-md rounded-2xl p-2.5 shadow-xl border border-stone-800 flex flex-col gap-2">
+            <div className="flex items-center justify-between px-1.5">
+              <div className="flex items-center gap-2">
+                <Disc3 className={`w-4 h-4 text-emerald-400 ${isMusicPlaying ? "animate-spin" : ""}`} />
+                <span className="text-[11px] font-bold text-stone-200 tracking-wide">
+                  Madam Ji's Song • Happy Birthday Piano
+                </span>
               </div>
-              <div>
-                <p className="text-[13px] font-bold text-white tracking-wide">
-                  Happy Birthday - Piano Version
-                </p>
-                <p className="text-[11px] text-stone-400">
-                  Magical Tunes • For Madam Ji
-                </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  className="text-stone-400 hover:text-white transition p-1"
+                  title={isMuted ? "Unmute" : "Mute"}
+                >
+                  {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={togglePlayPause}
+                  className="w-7 h-7 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black flex items-center justify-center font-bold text-xs transition active:scale-95"
+                  title={isMusicPlaying ? "Pause" : "Play"}
+                >
+                  {isMusicPlaying ? "❚❚" : "▶"}
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 pr-1">
-              <button
-                type="button"
-                onClick={toggleMute}
-                className="text-stone-400 hover:text-white transition p-1"
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
-              </button>
-              <button
-                type="button"
-                onClick={togglePlayPause}
-                className="w-8 h-8 rounded-full bg-white text-stone-900 flex items-center justify-center hover:scale-105 active:scale-95 transition shadow-sm font-bold text-xs"
-                title={isMusicPlaying ? "Pause" : "Play"}
-              >
-                {isMusicPlaying ? "❚❚" : "▶"}
-              </button>
-            </div>
+            {/* Embedded Spotify Track with Compact Styling */}
+            <iframe
+              style={{ borderRadius: "10px" }}
+              src="https://open.spotify.com/embed/track/0uROb6x5IunKokDggpmwKz?utm_source=generator&theme=0"
+              width="100%"
+              height="80"
+              frameBorder="0"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              title="Spotify Piano Birthday Track"
+            />
           </div>
         </div>
       )}
@@ -464,7 +441,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  playTone(580, "triangle", 0.25);
+                  playSoundEffect(580, "triangle", 0.25);
                   setCurrentStep(4);
                 }}
                 className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
@@ -557,7 +534,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    playTone(650, "sine", 0.35);
+                    playSoundEffect(650, "sine", 0.35);
                     setCurrentStep(5);
                   }}
                   className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group animate-bounce"
@@ -676,7 +653,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  playTone(620, "sine", 0.35);
+                  playSoundEffect(620, "sine", 0.35);
                   setCurrentStep(7);
                 }}
                 className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
