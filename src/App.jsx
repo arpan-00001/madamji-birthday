@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
-  Heart, Sparkles, Cake, Star, Music, Volume2, VolumeX, 
-  Camera, RefreshCw, ChevronRight, Moon, Lightbulb, 
-  PartyPopper, Wand2, Mail, Check, Disc3, Image as ImageIcon, X
+  Heart, Sparkles, Star, Music, Volume2, VolumeX, 
+  ChevronRight, Lightbulb, Wand2, Mail, Disc3, RefreshCw
 } from "lucide-react";
 
 export default function App() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showSpotify, setShowSpotify] = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [envelopeOpened, setEnvelopeOpened] = useState(false);
   const [lightsOn, setLightsOn] = useState(false);
   const [cakeCut, setCakeCut] = useState(false);
@@ -16,7 +16,9 @@ export default function App() {
   const [isCutting, setIsCutting] = useState(false);
   const [activeZoomPhoto, setActiveZoomPhoto] = useState(null);
 
-  // Real photos mapped with primary direct CDN link, captions and subtitles
+  // Background Audio Ref for guaranteed instant autoplay on letter click
+  const audioRef = useRef(null);
+
   const polaroids = [
     {
       id: 1,
@@ -24,8 +26,7 @@ export default function App() {
       subtitle: "White SUV adventure & sunny roads",
       tag: "Road Trip by the Car",
       rotation: "-rotate-2",
-      imageSrc: "https://i.ibb.co/3YQgJLhB/WhatsApp-Image-2026-11-06-at-00-22-50.jpg",
-      pageUrl: "https://ibb.co/3YQgJLhB"
+      imageSrc: "https://i.ibb.co/3YQgJLhB/WhatsApp-Image-2026-11-06-at-00-22-50.jpg"
     },
     {
       id: 2,
@@ -33,8 +34,7 @@ export default function App() {
       subtitle: "Festive celebration & golden smiles",
       tag: "Festive Night Out",
       rotation: "rotate-2",
-      imageSrc: "https://i.ibb.co/C3rNJ2qg/WhatsApp-Image-2026-11-06-at-00-26-17.jpeg",
-      pageUrl: "https://ibb.co/C3rNJ2qg"
+      imageSrc: "https://i.ibb.co/C3rNJ2qg/WhatsApp-Image-2026-11-06-at-00-26-17.jpeg"
     },
     {
       id: 3,
@@ -42,8 +42,7 @@ export default function App() {
       subtitle: "Playful wink & golden hour curls",
       tag: "Cute Wink & Curls",
       rotation: "-rotate-1",
-      imageSrc: "https://i.ibb.co/3y1bKtD3/WhatsApp-Image-2026-11-06-at-00-21-29.jpg",
-      pageUrl: "https://ibb.co/3y1bKtD3"
+      imageSrc: "https://i.ibb.co/3y1bKtD3/WhatsApp-Image-2026-11-06-at-00-21-29.jpg"
     },
     {
       id: 4,
@@ -51,12 +50,11 @@ export default function App() {
       subtitle: "Pure elegance & butterfly charm",
       tag: "Butterfly Glow Portrait",
       rotation: "rotate-3",
-      imageSrc: "https://i.ibb.co/M4pvGLD/WhatsApp-Image-2026-11-06-at-00-23-33.jpg",
-      pageUrl: "https://ibb.co/M4pvGLD"
+      imageSrc: "https://i.ibb.co/M4pvGLD/WhatsApp-Image-2026-11-06-at-00-23-33.jpg"
     }
   ];
 
-  // Audio synthesizer for cute sound effects using Web Audio API
+  // Sound effects
   const playChime = (freq = 520, type = "sine", duration = 0.4) => {
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -70,9 +68,7 @@ export default function App() {
       gain.connect(audioCtx.destination);
       osc.start();
       osc.stop(audioCtx.currentTime + duration);
-    } catch (e) {
-      // Audio not permitted or supported
-    }
+    } catch (e) {}
   };
 
   const playConfettiMelody = () => {
@@ -92,13 +88,20 @@ export default function App() {
     });
   };
 
-  // Screen 1: Open Envelope & Trigger Background Music
+  // Screen 1: Open Envelope & Instant Background Music Autoplay
   const handleEnvelopeClick = () => {
     playChime(440, "triangle", 0.3);
     setEnvelopeOpened(true);
-    // Envelope click karte hi music widget active aur gana autoplay start
     setShowSpotify(true);
-    setIsMusicPlaying(true);
+
+    // Play Background Audio instantly
+    if (audioRef.current) {
+      audioRef.current.play().then(() => {
+        setIsMusicPlaying(true);
+      }).catch(() => {
+        setIsMusicPlaying(true);
+      });
+    }
 
     setTimeout(() => {
       playChime(660, "sine", 0.5);
@@ -106,7 +109,24 @@ export default function App() {
     }, 1800);
   };
 
-  // Screen 2: Lights Switch
+  const togglePlayPause = () => {
+    if (!audioRef.current) return;
+    if (isMusicPlaying) {
+      audioRef.current.pause();
+      setIsMusicPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsMusicPlaying(true);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+    audioRef.current.muted = !isMuted;
+    setIsMuted(!isMuted);
+  };
+
+  // Screen 2: Turn on Lights
   const handleTurnLightsOn = () => {
     setLightsOn(true);
     playConfettiMelody();
@@ -115,7 +135,7 @@ export default function App() {
     }, 1200);
   };
 
-  // Screen 4: Cake Cutting logic
+  // Screen 4: Cake Cutting
   const handleCakeSlice = () => {
     if (cakeCut) return;
     setIsCutting(true);
@@ -147,7 +167,15 @@ export default function App() {
   return (
     <div className="min-h-screen w-full bg-[#fdf8f4] text-[#4a3b32] font-sans antialiased relative overflow-hidden flex flex-col items-center justify-between selection:bg-pink-200">
       
-      {/* Background Floating Ambient Particles */}
+      {/* Hidden Piano Instrumental Audio with Loop */}
+      <audio 
+        ref={audioRef} 
+        src="https://cdn.pixabay.com/download/audio/2022/10/30/audio_5170f218ce.mp3?filename=happy-birthday-piano-125016.mp3" 
+        loop 
+        preload="auto"
+      />
+
+      {/* Background Floating Particles */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-10 left-[10%] w-32 h-32 bg-pink-200/40 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-20 right-[15%] w-48 h-48 bg-amber-100/60 rounded-full blur-3xl animate-pulse" />
@@ -167,22 +195,21 @@ export default function App() {
         ))}
       </div>
 
-      {/* Top Header / Progress Bar */}
+      {/* Top Header */}
       <header className="w-full max-w-md pt-5 px-6 flex items-center justify-between z-20">
         <div className="flex items-center gap-1.5 text-xs tracking-wider text-pink-600/80 font-medium uppercase">
           <Heart className="w-3.5 h-3.5 fill-pink-500 text-pink-500 animate-bounce" />
           <span>Birthday Surprise</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Spotify Player Toggle Button (visible once music starts) */}
-          {isMusicPlaying && (
+          {showSpotify && (
             <button
-              onClick={() => setShowSpotify(!showSpotify)}
-              title="Music Player"
+              onClick={togglePlayPause}
+              title="Music Play/Pause"
               className="flex items-center gap-1 text-[11px] font-semibold text-pink-700 bg-pink-100/90 hover:bg-pink-200 border border-pink-200 px-2.5 py-1 rounded-full shadow-sm transition-all"
             >
-              <Disc3 className="w-3.5 h-3.5 animate-spin text-pink-600" />
-              <span>{showSpotify ? "Hide Player" : "Music 🎵"}</span>
+              <Disc3 className={`w-3.5 h-3.5 text-pink-600 ${isMusicPlaying ? "animate-spin" : ""}`} />
+              <span>{isMusicPlaying ? "Playing 🎵" : "Paused ⏸️"}</span>
             </button>
           )}
           <span className="text-[11px] font-semibold text-stone-400 bg-white/70 backdrop-blur px-2.5 py-1 rounded-full border border-stone-200 shadow-sm">
@@ -191,31 +218,46 @@ export default function App() {
         </div>
       </header>
 
-      {/* Floating Spotify Player with Autoplay */}
+      {/* Clean Premium Music Player (No Preview Badge, No Remove Button) */}
       {showSpotify && (
         <div className="w-full max-w-md px-4 mt-2 z-20 transition-all duration-300">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-pink-100 flex flex-col gap-1">
-            <div className="flex items-center justify-between px-2 text-[10px] text-stone-400 font-medium">
-              <span className="flex items-center gap-1">
-                <Music className="w-3 h-3 text-pink-500" /> Playing Madam Ji's Song
-              </span>
-              <button 
-                onClick={() => setShowSpotify(false)} 
-                className="hover:text-stone-700 text-xs px-1"
+          <div className="bg-stone-900/95 text-white backdrop-blur-md rounded-2xl p-3 shadow-xl border border-stone-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center">
+                <div className={`w-11 h-11 rounded-full bg-gradient-to-tr from-stone-800 to-stone-700 border-2 border-stone-600 flex items-center justify-center shadow-md ${isMusicPlaying ? "animate-spin" : ""}`} style={{ animationDuration: "5s" }}>
+                  <div className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center text-[8px] font-bold text-black">
+                    ♪
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-white tracking-wide">
+                  Happy Birthday - Piano Version
+                </p>
+                <p className="text-[11px] text-stone-400">
+                  Magical Tunes • For Madam Ji
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 pr-1">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="text-stone-400 hover:text-white transition p-1"
+                title={isMuted ? "Unmute" : "Mute"}
               >
-                ✕
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={togglePlayPause}
+                className="w-8 h-8 rounded-full bg-white text-stone-900 flex items-center justify-center hover:scale-105 active:scale-95 transition shadow-sm font-bold text-xs"
+                title={isMusicPlaying ? "Pause" : "Play"}
+              >
+                {isMusicPlaying ? "❚❚" : "▶"}
               </button>
             </div>
-            <iframe 
-              style={{ borderRadius: "12px" }} 
-              src="https://open.spotify.com/embed/track/0uROb6x5IunKokDggpmwKz?utm_source=generator&theme=0&autoplay=1" 
-              width="100%" 
-              height="80" 
-              frameBorder="0" 
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-              loading="lazy"
-              title="Spotify Birthday Track"
-            />
           </div>
         </div>
       )}
@@ -268,6 +310,7 @@ export default function App() {
 
             <div className="mt-6 w-full max-w-xs">
               <button
+                type="button"
                 onClick={handleEnvelopeClick}
                 disabled={envelopeOpened}
                 className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl hover:from-pink-600 hover:to-rose-600 active:scale-95 transition-all flex items-center justify-center gap-2 group"
@@ -335,6 +378,7 @@ export default function App() {
 
             <div className="w-full max-w-xs z-10 mb-2">
               <button
+                type="button"
                 onClick={handleTurnLightsOn}
                 className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-400 text-stone-900 font-semibold text-sm shadow-lg shadow-amber-500/30 hover:shadow-amber-400/60 active:scale-95 transition-all flex items-center justify-center gap-2 border border-amber-200"
               >
@@ -385,6 +429,7 @@ export default function App() {
 
             <div className="w-full max-w-xs">
               <button
+                type="button"
                 onClick={() => {
                   playChime(580, "triangle", 0.3);
                   setCurrentStep(4);
@@ -477,6 +522,7 @@ export default function App() {
             <div className="mt-5 w-full max-w-xs">
               {cakeCut ? (
                 <button
+                  type="button"
                   onClick={() => {
                     playChime(650, "sine", 0.4);
                     setCurrentStep(5);
@@ -488,6 +534,7 @@ export default function App() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={handleCakeSlice}
                   className="w-full py-3.5 px-6 rounded-full bg-pink-100 hover:bg-pink-200 text-pink-700 font-semibold text-sm transition-all flex items-center justify-center gap-2"
                 >
@@ -526,6 +573,7 @@ export default function App() {
 
             <div className="w-full max-w-xs">
               <button
+                type="button"
                 onClick={handleMakeWish}
                 disabled={wishMade}
                 className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium text-sm shadow-lg shadow-pink-300/50 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 group"
@@ -537,7 +585,7 @@ export default function App() {
           </div>
         )}
 
-        {/* SCREEN 6: POLAROID MEMORY GALLERY WITH REAL HOSTED PHOTOS */}
+        {/* SCREEN 6: POLAROID MEMORY GALLERY */}
         {currentStep === 6 && (
           <div className="w-full flex flex-col items-center text-center animate-fade-in">
             <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-800 tracking-tight">
@@ -547,13 +595,12 @@ export default function App() {
               Here's to all the laughs, chaos, late-night talks and little moments.
             </p>
 
-            {/* Helper tip banner */}
             <div className="text-[11px] text-pink-700 bg-pink-50/90 border border-pink-200 rounded-full px-3.5 py-1 mb-3.5 flex items-center gap-1.5 shadow-sm">
               <Sparkles className="w-3.5 h-3.5 text-pink-500" />
               <span>Tap any photo to view full size!</span>
             </div>
 
-            {/* 4 Aesthetic Polaroids Grid with Real Photos, Captions & Subtitles */}
+            {/* 4 Aesthetic Polaroids with Real Photos, Captions & Subtitles */}
             <div className="grid grid-cols-2 gap-3.5 w-full max-w-sm px-2 mb-4">
               {polaroids.map((item) => (
                 <div
@@ -561,10 +608,8 @@ export default function App() {
                   className={`bg-white p-2.5 pb-3 rounded-2xl shadow-md hover:shadow-xl transition-all border border-stone-200/90 flex flex-col items-center group relative cursor-pointer ${item.rotation}`}
                   onClick={() => setActiveZoomPhoto(item)}
                 >
-                  {/* Polaroid Pin / Tape aesthetic */}
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-3.5 bg-amber-200/60 backdrop-blur-xs rounded-xs border-b border-amber-300/40 rotate-1 z-20 pointer-events-none" />
 
-                  {/* Photo frame */}
                   <div className="w-full aspect-square rounded-xl overflow-hidden relative bg-stone-100 flex items-center justify-center border border-stone-100 shadow-inner">
                     <img
                       src={item.imageSrc}
@@ -572,25 +617,22 @@ export default function App() {
                       loading="eager"
                       onError={(e) => {
                         const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(item.imageSrc)}`;
-                        if (e.target.src !== weservUrl) {
-                          e.target.src = weservUrl;
+                        if (e.currentTarget.src !== weservUrl) {
+                          e.currentTarget.src = weservUrl;
                         }
                       }}
                       className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
 
-                    {/* Zoom Indicator */}
                     <div className="absolute bottom-1.5 right-1.5 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Sparkles className="w-3 h-3 text-yellow-300" />
+                      <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
                     </div>
                   </div>
 
-                  {/* Caption */}
                   <div className="mt-2 text-stone-800 font-serif italic text-xs tracking-tight text-center font-bold">
                     {item.caption}
                   </div>
 
-                  {/* Subtitle / Description */}
                   <div className="mt-0.5 text-[10px] text-stone-400 font-sans tracking-tight text-center leading-tight">
                     {item.subtitle}
                   </div>
@@ -598,9 +640,9 @@ export default function App() {
               ))}
             </div>
 
-            {/* Read Letter Button */}
             <div className="w-full max-w-xs mt-2">
               <button
+                type="button"
                 onClick={() => {
                   playChime(620, "sine", 0.4);
                   setCurrentStep(7);
@@ -625,6 +667,7 @@ export default function App() {
               onClick={(e) => e.stopPropagation()}
             >
               <button
+                type="button"
                 onClick={() => setActiveZoomPhoto(null)}
                 className="absolute top-2 right-2 bg-stone-100 hover:bg-stone-200 text-stone-700 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shadow transition-all"
               >
@@ -690,6 +733,7 @@ export default function App() {
 
             <div className="w-full max-w-xs">
               <button
+                type="button"
                 onClick={() => {
                   playConfettiMelody();
                   setCurrentStep(8);
@@ -746,6 +790,7 @@ export default function App() {
 
             <div className="w-full max-w-xs space-y-2">
               <button
+                type="button"
                 onClick={resetAll}
                 className="w-full py-3.5 px-6 rounded-full bg-white border border-pink-200 text-pink-600 font-semibold text-sm shadow-md hover:bg-pink-50 active:scale-95 transition-all flex items-center justify-center gap-2 group"
               >
